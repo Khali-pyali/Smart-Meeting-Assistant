@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Call - SmartMeet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body class="bg-gray-900 text-white min-h-screen flex flex-col">
+    <nav class="bg-gray-800 border-b border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="text-xl font-bold text-indigo-400">SmartMeet Video Call</div>
+                <button onclick="endCall()"
+                    class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                    End Call
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-1 flex flex-col items-center justify-center p-4">
+        <div class="w-full max-w-6xl">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Remote Video -->
+                <div class="relative bg-gray-800 rounded-lg overflow-hidden aspect-video">
+                    <video id="remote-video" autoplay playsinline class="w-full h-full object-cover"></video>
+                    <div id="waiting-msg" class="absolute inset-0 flex items-center justify-center bg-gray-800">
+                        <div class="text-center">
+                            <i data-lucide="users" class="w-16 h-16 mx-auto text-gray-600 mb-4"></i>
+                            <p class="text-gray-400">Waiting for others to join...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Local Video -->
+                <div class="relative bg-gray-800 rounded-lg overflow-hidden aspect-video">
+                    <video id="local-video" autoplay muted playsinline
+                        class="w-full h-full object-cover mirror"></video>
+                    <div class="absolute bottom-4 left-4 bg-black bg-opacity-50 px-3 py-1 rounded-full text-sm">
+                        You
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="mt-6 flex justify-center gap-4">
+                <button id="toggle-video" onclick="toggleVideo()"
+                    class="bg-gray-700 hover:bg-gray-600 p-4 rounded-full">
+                    <i data-lucide="video" class="w-6 h-6"></i>
+                </button>
+                <button id="toggle-audio" onclick="toggleAudio()"
+                    class="bg-gray-700 hover:bg-gray-600 p-4 rounded-full">
+                    <i data-lucide="mic" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <div class="mt-4 text-center text-sm text-gray-400">
+                <p id="status">Connecting...</p>
+            </div>
+        </div>
+    </main>
+
+    <style>
+        .mirror {
+            transform: scaleX(-1);
+        }
+    </style>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const meetingId = urlParams.get('id');
+        const socket = io('http://localhost:5000');
+
+        let localStream;
+        let peerConnection;
+        let isVideoEnabled = true;
+        let isAudioEnabled = true;
+
+        const config = {
+            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        };
+
+        async function startCall() {
+            try {
+                // Get local media
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: true
+                });
+                document.getElementById('local-video').srcObject = localStream;
+                document.getElementById('status').textContent = 'Connected - Waiting for others';
+
+                // Join the call room
+                socket.emit('join_call', { meeting_id: meetingId });
+
+                lucide.createIcons();
+            } catch (err) {
+                console.error('Error accessing media devices:', err);
+                document.getElementById('status').textContent = 'Error: Could not access camera/microphone';
+            }
+        }
+
+        function createPeerConnection(userId) {
+            peerConnection = new RTCPeerConnection(config);
+
+            // Add local stream tracks
+            localStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, localStream);
+            });
+
+            // Handle incoming tracks
+            peerConnection.ontrack = (event) => {
+                document.getElementById('remote-video').srcObject = event.streams[0];
+                document.getElementById('waiting-msg').style.display = 'none';
+                document.getElementById('status').textContent = 'Call in progress';
+            };
+
+            // Handle ICE candidates
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.emit('ice_candidate', {
+                        target: userId,
+                        candidate: event.candidate
+                    });
+                }
+            };
+
+            return peerConnection;
+        }
+
+        // Socket event handlers
+        socket.on('user_joined', async (data) => {
+            console.log('User joined:', data.user_id);
+            const pc = createPeerConnection(data.user_id);
+
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            socket.emit('offer', {
+                target: data.user_id,
+                offer: offer
+            });
+        });
+
+        socket.on('offer', async (data) => {
+            console.log('Received offer');
+            const pc = createPeerConnection(data.target);
+
+            await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+
+            socket.emit('answer', {
+                target: data.target,
+                answer: answer
+            });
+        });
+
+        socket.on('answer', async (data) => {
+            console.log('Received answer');
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+        });
+
+        socket.on('ice_candidate', async (data) => {
+            if (peerConnection) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+            }
+        });
+
+        socket.on('user_left', () => {
+            document.getElementById('remote-video').srcObject = null;
+            document.getElementById('waiting-msg').style.display = 'flex';
+            document.getElementById('status').textContent = 'User left - Waiting for others';
+        });
+
+        function toggleVideo() {
+            isVideoEnabled = !isVideoEnabled;
+            localStream.getVideoTracks()[0].enabled = isVideoEnabled;
+            const btn = document.getElementById('toggle-video');
+            btn.classList.toggle('bg-red-600');
+            btn.querySelector('i').setAttribute('data-lucide', isVideoEnabled ? 'video' : 'video-off');
+            lucide.createIcons();
+        }
+
+        function toggleAudio() {
+            isAudioEnabled = !isAudioEnabled;
+            localStream.getAudioTracks()[0].enabled = isAudioEnabled;
+            const btn = document.getElementById('toggle-audio');
+            btn.classList.toggle('bg-red-600');
+            btn.querySelector('i').setAttribute('data-lucide', isAudioEnabled ? 'mic' : 'mic-off');
+            lucide.createIcons();
+        }
+
+        function endCall() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+            if (peerConnection) {
+                peerConnection.close();
+            }
+            socket.emit('leave_call', { meeting_id: meetingId });
+            window.location.href = '/meeting_detail.html?id=' + meetingId;
+        }
+
+        startCall();
+    </script>
+</body>
+
+</html>
