@@ -1,65 +1,52 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Action Items - SmartMeet</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-</head>
-
-<body class="bg-gray-50 text-gray-900 min-h-screen">
-    <nav class="bg-white border-b border-gray-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex">
-                    <div class="flex-shrink-0 flex items-center">
-                        <span class="text-xl font-bold text-indigo-600">SmartMeet</span>
-                    </div>
-                    <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
-                        <a href="/"
-                            class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                            Dashboard
-                        </a>
-                        <a href="/action_items.html"
-                            class="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                            Action Items
-                        </a>
-                        <a href="/ask_ai.html"
-                            class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                            Ask AI
-                        </a>
-                    </div>
+<nav class="bg-white border-b border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16">
+            <div class="flex">
+                <div class="flex-shrink-0 flex items-center">
+                    <span class="text-xl font-bold text-indigo-600">SmartMeet</span>
+                </div>
+                <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
+                    <a href="/"
+                        class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                        Dashboard
+                    </a>
+                    <a href="/action_items.html"
+                        class="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                        Action Items
+                    </a>
+                    <a href="/ask_ai.html"
+                        class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                        Ask AI
+                    </a>
                 </div>
             </div>
         </div>
-    </nav>
+    </div>
+</nav>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 class="text-2xl font-semibold text-gray-900 mb-6">All Action Items</h1>
-        <div class="bg-white shadow overflow-hidden sm:rounded-md">
-            <ul id="action-items-list" class="divide-y divide-gray-200">
-                <li class="px-4 py-4 sm:px-6 text-center text-gray-500">Loading...</li>
-            </ul>
-        </div>
-    </main>
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <h1 class="text-2xl font-semibold text-gray-900 mb-6">All Action Items</h1>
+    <div class="bg-white shadow overflow-hidden sm:rounded-md">
+        <ul id="action-items-list" class="divide-y divide-gray-200">
+            <li class="px-4 py-4 sm:px-6 text-center text-gray-500">Loading...</li>
+        </ul>
+    </div>
+</main>
 
-    <script src="/static/js/api.js"></script>
-    <script>
-        async function loadActionItems() {
-            try {
-                const res = await api.getActionItems();
-                const items = res.data;
-                const list = document.getElementById('action-items-list');
+<script src="/static/js/api.js"></script>
+<script>
+    async function loadActionItems() {
+        try {
+            const res = await api.getActionItems();
+            const items = res.data;
+            const list = document.getElementById('action-items-list');
 
-                if (items.length === 0) {
-                    list.innerHTML = '<li class="px-4 py-4 sm:px-6 text-center text-gray-500">No action items found.</li>';
-                    return;
-                }
+            if (items.length === 0) {
+                list.innerHTML = '<li class="px-4 py-4 sm:px-6 text-center text-gray-500">No action items found.</li>';
+                return;
+            }
 
-                list.innerHTML = items.map(item => `
+            list.innerHTML = items.map(item => `
                     <li class="px-4 py-4 sm:px-6 hover:bg-gray-50">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center min-w-0">
@@ -84,28 +71,28 @@
                         </div>
                     </li>
                 `).join('');
-            } catch (err) {
-                console.error(err);
-                document.getElementById('action-items-list').innerHTML = '<li class="px-4 py-4 sm:px-6 text-center text-red-500">Error loading items.</li>';
-            }
+        } catch (err) {
+            console.error(err);
+            document.getElementById('action-items-list').innerHTML = '<li class="px-4 py-4 sm:px-6 text-center text-red-500">Error loading items.</li>';
         }
+    }
 
-        async function toggleStatus(id, isChecked) {
-            const status = isChecked ? 'completed' : 'pending';
-            try {
-                await api.updateActionItem(id, { status });
-                // Update UI badge immediately
-                const badge = document.getElementById(`status-${id}`);
-                badge.textContent = status;
-                badge.className = `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`;
-            } catch (err) {
-                alert('Failed to update status');
-                // Revert checkbox if failed (optional, but good UX)
-            }
+    async function toggleStatus(id, isChecked) {
+        const status = isChecked ? 'completed' : 'pending';
+        try {
+            await api.updateActionItem(id, { status });
+            // Update UI badge immediately
+            const badge = document.getElementById(`status-${id}`);
+            badge.textContent = status;
+            badge.className = `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`;
+        } catch (err) {
+            alert('Failed to update status');
+            // Revert checkbox if failed (optional, but good UX)
         }
+    }
 
-        loadActionItems();
-    </script>
+    loadActionItems();
+</script>
 </body>
 
 </html>
