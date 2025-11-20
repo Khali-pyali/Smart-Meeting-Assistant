@@ -139,6 +139,7 @@ MIT License
 
 ## Author
 
+**Surbhi**  
 Created as a college assignment project
 
 ---
